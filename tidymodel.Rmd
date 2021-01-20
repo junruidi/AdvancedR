@@ -1,0 +1,103 @@
+---
+title: "Tidy Modeling with R"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+## 1. Why Tidyness is important for modeling
+
+There are a few existing R packages that provide a unified interface to harmonize these heterogeneous modeling APIs, such as `caret` and `mlr`. The `tidymodels` framework is similar to these in adopting a unification of the function interface, as well as enforcing consistency in the function names and return values. It is different in its opinionated design goals and modeling implementation.
+
+__Examples 1.1__
+
+The `broom::tidy()` function is a tool for standardizing the structure of R objects, which returns many types of R objects in a more usable format. 
+
+```{r, message=FALSE}
+library(tidyverse)
+# the result using map()
+
+corr_res = map(mtcars %>% select(-mpg), cor.test, mtcars$mpg)
+head(str(corr_res))
+corr_res[[1]]
+```
+
+Then use `broom::tidy`
+```{r}
+library(broom)
+tidy(corr_res[[1]])
+
+
+corr_res %>% 
+  # Convert each to a tidy format; `map_dfr()` stacks the data frames 
+  map_dfr(tidy, .id = "predictor") %>% 
+  ggplot(aes(x = fct_reorder(predictor, estimate))) + 
+  geom_point(aes(y = estimate)) + 
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = .1) +
+  labs(x = NULL, y = "Correlation with mpg")
+```
+
+
+## 2. Combing Base R models and the `tidyverse`
+
+`dplyr`, `purrr`, `tidyr` 
+
+__Example 2.1__
+
+Fit separate models for each category of one variable
+
+
+Step 1. separate the categories using `group_nest`
+```{r}
+data(crickets, package = "modeldata")
+split_by_species = crickets  %>% group_nest(species) 
+
+split_by_species
+```
+
+Step 2. Use `map` to train models
+
+```{r}
+model_by_species <- 
+  split_by_species %>% 
+  mutate(model = map(data, ~ lm(rate ~ temp, data = .x)))
+model_by_species
+```
+
+Step 3. Use `tidy` to convert them to consistent data frame formats
+```{r}
+model_by_species %>% 
+  mutate(coef = map(model, tidy)) %>% 
+  select(species, coef) %>% 
+  unnest(cols = c(coef))
+```
+
+## 3. Dataset Description
+
+The Ames housing data set
+
+```{r}
+data(ames, package = "modeldata")
+dim(ames)
+```
+```{r}
+ggplot(ames, aes(x = Sale_Price)) + geom_histogram(bins = 50)
+ggplot(ames, aes(x = Sale_Price)) + geom_histogram(bins = 50) + scale_x_log10()
+```
+
+```{r}
+ames = ames %>% mutate(Sale_Price = log10(Sale_Price))
+```
+
+## 4. Data Spending
+
+Steps to create useful model includes 
+
+* parameter estimation
+
+* model selection and tuning
+
+* performance assessment
+
+_data spending_: first consideration when modeling, how should the data be applied to these steps.

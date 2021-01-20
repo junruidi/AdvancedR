@@ -1,2 +1,2 @@
-# AdvancedR
-My study notes for advanced R topics. 
+# Advanced R Programming 
+My study notes for advanced R topics (`tidyverse`). 

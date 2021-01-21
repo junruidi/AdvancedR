@@ -1782,6 +1782,79 @@ dim(ames)</code></pre>
 <li><p>performance assessment</p></li>
 </ul>
 <p><em>data spending</em>: first consideration when modeling, how should the data be applied to these steps.</p>
+<div id="common-methods-for-splitting-data" class="section level3">
+<h3>4.1 Common methods for splitting data</h3>
+<p>Training set: develop and optimize the model</p>
+<p>Test set: final arbiter to determine the efficacy of the model</p>
+<p><code>inital_split()</code></p>
+<pre class="r"><code>library(rsample)
+set.seed(123)
+
+## Get the partitioning information
+ames_split = initial_split(ames, prob = 0.8)
+
+ames_train = training(ames_split)
+ames_test = testing(ames_split)</code></pre>
+<p><em>Stratified sampling</em> needs to be used when there is dramatic class imbalance. For regression problems, the outcome data can be artificially binned into quartiles and then stratified sampling conducted four separate times. This is an effective method for keeping the distributions of the outcome similar between the training and test set.</p>
+<pre class="r"><code>set.seed(123)
+ames_split &lt;- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train &lt;- training(ames_split)
+ames_test  &lt;-  testing(ames_split)</code></pre>
+</div>
+</div>
+<div id="feature-engineering-with-recipes" class="section level2">
+<h2>5. Feature Engineering with <code>recipes</code></h2>
+<div id="strucutre-of-a-recipe" class="section level3">
+<h3>5.1 Strucutre of a recipe</h3>
+<pre class="r"><code>library(tidymodels)</code></pre>
+<pre><code>## -- Attaching packages -------------------------------------- tidymodels 0.1.2 --</code></pre>
+<pre><code>## v dials     0.0.9      v recipes   0.1.15
+## v infer     0.5.4      v tune      0.1.2 
+## v modeldata 0.1.0      v workflows 0.2.1 
+## v parsnip   0.1.5      v yardstick 0.0.7</code></pre>
+<pre><code>## -- Conflicts ----------------------------------------- tidymodels_conflicts() --
+## x scales::discard() masks purrr::discard()
+## x dplyr::filter()   masks stats::filter()
+## x recipes::fixed()  masks stringr::fixed()
+## x dplyr::lag()      masks stats::lag()
+## x yardstick::spec() masks readr::spec()
+## x recipes::step()   masks stats::step()</code></pre>
+<pre class="r"><code>simple_ames =
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %&gt;%
+  step_log(Gr_Liv_Area, base = 10) %&gt;% 
+  step_dummy(all_nominal())
+simple_ames</code></pre>
+<pre><code>## Data Recipe
+## 
+## Inputs:
+## 
+##       role #variables
+##    outcome          1
+##  predictor          4
+## 
+## Operations:
+## 
+## Log transformation on Gr_Liv_Area
+## Dummy variables from all_nominal()</code></pre>
+<ol style="list-style-type: decimal">
+<li><code>recipe</code> specifies the columns needed for the model</li>
+<li><code>step_log</code> declares which variable should be log transformed</li>
+<li><code>step_dummy</code>specifies converting all to dummy. The function <code>all_nominal</code> captures the names of any columns that are currently factor or character</li>
+</ol>
+</div>
+<div id="using-recipes" class="section level3">
+<h3>5.2 Using recipes</h3>
+<p><code>recipe</code>: defines the preprocessing,returns a recipe <span class="math inline">\(\rightarrow\)</span></p>
+<p><code>prep</code>: calculates the statistics from the training set, returns a recipe <span class="math inline">\(\rightarrow\)</span></p>
+<p><code>bake</code>: applies the preprocessing to datasets, returns a tibble</p>
+</div>
+<div id="encoding-qualitatitive-data" class="section level3">
+<h3>5.3 Encoding qualitatitive data</h3>
+<p><code>step_unknown</code>: change missing value to a dedicated factor</p>
+<p><code>step_novel</code>: allot new level for new factor level in new data</p>
+<p><code>step_other</code>: analyze the frequencies of the factor levels in the training set and convert infrequently occurring values to a catch-all level of “other”, with a specific threshold that can be specified</p>
+</div>
 </div>
 
 

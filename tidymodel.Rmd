@@ -101,3 +101,67 @@ Steps to create useful model includes
 * performance assessment
 
 _data spending_: first consideration when modeling, how should the data be applied to these steps.
+
+### 4.1 Common methods for splitting data
+
+Training set: develop and optimize the model
+
+Test set: final arbiter to determine the efficacy of the model
+
+
+`inital_split()`
+
+```{r}
+library(rsample)
+set.seed(123)
+
+## Get the partitioning information
+ames_split = initial_split(ames, prob = 0.8)
+
+ames_train = training(ames_split)
+ames_test = testing(ames_split)
+```
+
+_Stratified sampling_ needs to be used when there is dramatic class imbalance.  For regression problems, the outcome data can be artificially binned into quartiles and then stratified sampling conducted four separate times. This is an effective method for keeping the distributions of the outcome similar between the training and test set.
+
+```{r}
+set.seed(123)
+ames_split <- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test  <-  testing(ames_split)
+```
+
+## 5. Feature Engineering with `recipes`
+
+
+### 5.1 Strucutre of a recipe
+```{r}
+library(tidymodels)
+simple_ames =
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_dummy(all_nominal())
+simple_ames
+```
+
+1. `recipe` specifies the columns needed for the model
+2. `step_log` declares which variable should be log transformed
+3. `step_dummy`specifies converting all to dummy. The function `all_nominal` captures the names of any columns that are currently factor or character
+
+
+### 5.2 Using recipes
+
+`recipe`: defines the preprocessing,returns a recipe $\rightarrow$ 
+
+`prep`: calculates the statistics from the training set, returns a recipe $\rightarrow$ 
+
+`bake`: applies the preprocessing to datasets, returns a tibble 
+
+### 5.3 Encoding qualitatitive data
+
+`step_unknown`: change missing value to a dedicated factor
+
+`step_novel`: allot new level for new factor level in new data
+
+`step_other`:  analyze the frequencies of the factor levels in the training set and convert infrequently occurring values to a catch-all level of “other”, with a specific threshold that can be specified

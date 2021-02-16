@@ -1,9 +1,11 @@
 ---
 title: "Tidy Modeling with R"
 output:
-  html_document:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
     toc: true
-    toc_float: true
+    # toc_float: true
 ---
 
 ## 1. Why Tidyness is important for modeling
@@ -133,6 +135,15 @@ ames_test  <-  testing(ames_split)
 
 ## 5. Feature Engineering with `recipes`
 
+Examples of preprocessing to build better features for modeling:
+
+* Correlation between predictors can be reduced via feature extraction or the removal of some predictors
+
+* When some predictors have missing values, they can be imputed using a sub-model
+
+* Models that use variance-type measures may benefit from coercing the distribution of some skewed predictors to be symmetric by estimating a transformation.
+
+
 
 ### 5.1 Strucutre of a recipe
 ```{r}
@@ -150,18 +161,242 @@ simple_ames
 3. `step_dummy`specifies converting all to dummy. The function `all_nominal` captures the names of any columns that are currently factor or character
 
 
+_Advantages_
+
+1. Can be recycled across models since not tightly coupled to the modeling function
+
+2. Broader choices for data processing than formulas can offer
+
+3. Compact syntax, e.g. `all_nominal`
+
+4. All procedures captured in one R object
+
+
 ### 5.2 Using recipes
 
-`recipe`: defines the preprocessing,returns a recipe $\rightarrow$ 
+`recipe`: defines the preprocessing,returns a recipe 
+
+```{r, eval=FALSE}
+simple_ames =
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_dummy(all_nominal())
+simple_ames
+```
+
+$\bigg\downarrow$
 
 `prep`: calculates the statistics from the training set, returns a recipe $\rightarrow$ 
 
+```{r}
+simple_ames <- prep(simple_ames, training = ames_train)
+simple_ames
+```
+
+if set `retain = TRUE` (default), the prepared version of the training set is kept within the recipe. So, for future calcualtion, redundant calcuation can be avoided. 
+
+
+$\bigg\downarrow$
+
 `bake`: applies the preprocessing to datasets, returns a tibble 
 
-### 5.3 Encoding qualitatitive data
+```{r}
+test_ex = bake(simple_ames, new_data = ames_test)
+names(test_ex) %>% head()
+```
 
-`step_unknown`: change missing value to a dedicated factor
+
+To get the preprocessed version of the training 
+
+```{r}
+train_ex = bake(simple_ames, new_data = NULL) 
+```
+
+### 5.3 Encoding qualitatitive data (factors or characters)
+
+`step_unknown`: change missing value to a dedicated factor. 
 
 `step_novel`: allot new level for new factor level in new data
 
-`step_other`:  analyze the frequencies of the factor levels in the training set and convert infrequently occurring values to a catch-all level of “other”, with a specific threshold that can be specified
+`step_other`:  analyze the frequencies of the factor levels in the training set and convert infrequently occurring values to a catch-all level of “other”, with a specific threshold that can be specified `step_other(Neighborhood, threshold = 0.01)`
+
+### 5.4 Interaction terms
+
+```{r,eval=FALSE}
+simple_ames <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  # Gr_Liv_Area is on the log scale from a previous step
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") )
+```
+
+Suppose that, in a recipe, we had not yet made dummy variables for building types. It would be inappropriate to include a factor column in this step.
+
+### 5.5 Skipping steps for new data
+
+Each step function has an option called `skip` that, when set to `TRUE`, will be ignored by the `bake()` function used with a data set argument. In this way, you can isolate the steps that affect the modeling data without causing errors when applied to new samples. 
+
+### 5.6 Other exmaples of recipe steps
+
+1. Splines
+
+```{r, eval=FALSE}
+recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + Latitude,
+         data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>% 
+  step_ns(Latitude, deg_free = 20)
+```
+
+2. Feature extraction
+
+E.g. PCA
+In the Ames data, there are several predictors that measure size of the property, such as the total basement size (Total_Bsmt_SF), size of the first floor (First_Flr_SF), the general living area (Gr_Liv_Area), and so on. PCA might be an option to represent these potentially redundant variables as a smaller feature set. Apart from the general living area, these predictors have the suffix `SF` in their names (for square feet) so a recipe step for PCA might look like
+
+```{r,eval=FALSE}
+  step_pca(matches("(SF$)|(Gr_Liv)"))
+```
+
+There are existing recipe steps for other extraction methods, such as: independent component analysis (ICA), non-negative matrix factorization (NNMF), multidimensional scaling (MDS), uniform manifold approximation and projection (UMAP), and others.
+
+3. Row sampling steps
+
+Downsampling, upsampling, hybrid
+
+`step_downsample()`
+
+This should be only affected for training
+
+
+### 5.7 How data are used by the recipe
+
+Data are given to recipes at different stages. When calling `recipe(..., data)`, the data set is used to determine the data types of each column so that selectors such as `all_numeric()` can be used. When preparing the data using `prep(recipe, training)`, the data in training are used for all estimation operations, from determining factor levels to computing PCA components and everything in between. It is important to realize that all preprocessing and feature engineering steps only utilize the training data. Otherwise, information leakage can negatively impact the model.
+
+When using `bake(recipe, new_data)`, no quantities are re-estimated using the values in new_data. Take centering and scaling using `step_normalize()` as an example. Using this step, the means and standard deviations from the appropriate columns are determined from the training set; new samples are standardized using these values when `bake()` is invoked.
+
+### 5.8 Using `recipe` with traditional modeling function
+
+Full steps up till now:
+
+_(1) Data preprocessing and model fitting using `lm()`_
+
+```{r}
+ames_rec <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + 
+           Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>% 
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+
+ames_rec_prepped <- prep(ames_rec)
+ames_train_prepped <- bake(ames_rec_prepped, new_data = NULL)
+ames_test_prepped <- bake(ames_rec_prepped, ames_test)
+
+lm_fit <- lm(Sale_Price ~ ., data = ames_train_prepped)
+```
+
+
+_(2) Explore the model summary and coefficients using `broom`_
+
+```{r}
+broom::glance(lm_fit)
+```
+
+```{r}
+tidy(lm_fit)
+```
+
+_(3) Prediction_
+
+```{r}
+predict(lm_fit, ames_test_prepped %>% head())
+```
+
+### 5.9 tidy a recipe
+
+`recipes::tidy()` gives a summary of the recipe steps for an `recipe` object. 
+
+```{r}
+tidy(ames_rec_prepped)
+```
+
+### 5.10 Column roles
+
+`recipe()` assigns roles to each of the columns (predictor or outcome). It may be useful to keep that column in the data so that, after predictions are made, problematic results can be investigated in detail. In other words, the column is important but isn’t a predictor or outcome.
+
+### 5.11 Summary
+
+```{r,eval=FALSE}
+library(tidymodels)
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(123)
+ames_split <- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test  <-  testing(ames_split)
+
+ames_rec <- 
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + 
+           Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_other(Neighborhood, threshold = 0.01) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>% 
+  step_ns(Latitude, Longitude, deg_free = 20)
+```
+
+## 6. Fitting Models with `parsnip`
+
+The `parsnip` package provides a fluent and standardized interface for a variety of different models to avoid the procedures being heterogeneous in either how the data are passed to the model function or in terms of their arguments. 
+
+### 6.1 Create a model
+
+For tidymodels, the approach to specifying a model is intended to be more unified:
+
+1. _Specify the type of model based on its mathematical structure_ (e.g., linear regression, random forest, K-nearest neighbors, etc).
+
+2. _Specify the engine for fitting the model_. Most often this reflects the software package that should be used.
+
+3. _When required, declare the mode of the model_. The mode reflects the type of prediction outcome. For numeric outcomes, the mode is regression; for qualitative outcomes, it is classification10. If a model can only create one type of model, such as linear regression, the mode is already set.
+
+The `translate()` function can provide details on how parsnip converts the user's code to the package's syntax:
+
+```{r}
+library(parsnip)
+
+linear_reg() %>% set_engine("lm") %>% translate()
+linear_reg() %>% set_engine("glmnet") %>% translate()
+linear_reg() %>% set_engine("stan") %>% translate()
+```
+
+
+```{r}
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_form_fit <- 
+  lm_model %>% 
+  # Recall that Sale_Price has been pre-logged
+  fit(Sale_Price ~ Longitude + Latitude, data = ames_train)
+
+lm_xy_fit <- 
+  lm_model %>% 
+  fit_xy(
+    x = ames_train %>% select(Longitude, Latitude),
+    y = ames_train %>% pull(Sale_Price)
+    )
+    
+lm_form_fit
+lm_xy_fit
+```

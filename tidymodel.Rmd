@@ -8,6 +8,8 @@ output:
     # toc_float: true
 ---
 
+A personal study notes on `tidymodels`.
+
 ## 1. Why Tidyness is important for modeling
 
 There are a few existing R packages that provide a unified interface to harmonize these heterogeneous modeling APIs, such as `caret` and `mlr`. The `tidymodels` framework is similar to these in adopting a unification of the function interface, as well as enforcing consistency in the function names and return values. It is different in its opinionated design goals and modeling implementation.
@@ -399,4 +401,14 @@ lm_xy_fit <-
     
 lm_form_fit
 lm_xy_fit
+```
+
+### 6.2 Use the model results
+
+Use the `purrr::pluck()` function with argument `fit` 
+
+```{r}
+library(purrr)
+lm_form_fit %>% pluck("fit")
+lm_form_fit %>% pluck("fit") %>% vcov()
 ```

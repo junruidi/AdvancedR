@@ -8,7 +8,7 @@ output:
     # toc_float: true
 ---
 
-A personal study notes on `tidymodels`.
+__A personal study notes on `tidymodels`.__
 
 ## 1. Why Tidyness is important for modeling
 

@@ -1,5 +1,5 @@
 ---
-title: "Tidy Modeling with R"
+title: "Tidy Modeling with R Notes"
 output:
   prettydoc::html_pretty:
     theme: cayman

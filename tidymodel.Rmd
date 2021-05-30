@@ -8,7 +8,7 @@ output:
     # toc_float: true
 ---
 
-__A personal study notes on `tidymodels`.__
+__JD's personal study notes on `tidymodels`.__
 
 ## 1. Why Tidyness is important for modeling
 
@@ -373,7 +373,7 @@ For tidymodels, the approach to specifying a model is intended to be more unifie
 
 The `translate()` function can provide details on how parsnip converts the user's code to the package's syntax:
 
-```{r}
+```{r,eval=FALSE}
 library(parsnip)
 
 linear_reg() %>% set_engine("lm") %>% translate()
